@@ -108,6 +108,7 @@ static void AFNetworkReachabilityReleaseCallback(const void *info) {
 @property (readwrite, nonatomic, strong) id networkReachability;
 @property (readwrite, nonatomic, assign) AFNetworkReachabilityStatus networkReachabilityStatus;
 @property (readwrite, nonatomic, copy) AFNetworkReachabilityStatusBlock networkReachabilityStatusBlock;
+@property (readwrite, nonatomic, strong) dispatch_queue_t dispatchQueue;
 @end
 
 @implementation AFNetworkReachabilityManager
@@ -200,12 +201,16 @@ static void AFNetworkReachabilityReleaseCallback(const void *info) {
         }
 
     };
+    
+    NSString *name = [NSString stringWithFormat:@"com.alamofire.afnetworking.reachability.%lu",
+                      (unsigned long)self.hash];
+    _dispatchQueue = dispatch_queue_create([name UTF8String], NULL);
 
     id networkReachability = self.networkReachability;
     SCNetworkReachabilityContext context = {0, (__bridge void *)callback, AFNetworkReachabilityRetainCallback, AFNetworkReachabilityReleaseCallback, NULL};
     SCNetworkReachabilitySetCallback((__bridge SCNetworkReachabilityRef)networkReachability, AFNetworkReachabilityCallback, &context);
-    SCNetworkReachabilityScheduleWithRunLoop((__bridge SCNetworkReachabilityRef)networkReachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
-
+    SCNetworkReachabilitySetDispatchQueue((__bridge SCNetworkReachabilityRef)networkReachability, _dispatchQueue);
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0),^{
         SCNetworkReachabilityFlags flags;
         if (SCNetworkReachabilityGetFlags((__bridge SCNetworkReachabilityRef)networkReachability, &flags)) {
